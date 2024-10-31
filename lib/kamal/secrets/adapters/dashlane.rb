@@ -2,11 +2,7 @@ class Kamal::Secrets::Adapters::Dashlane < Kamal::Secrets::Adapters::Base
   private
     def login(account)
       unless loggedin?(account)
-        if account.nil? || account.empty?
-          `dcli sync`
-        else
-          `(echo #{account.shellescape}; cat) | dcli sync`
-        end
+        `(echo #{account.shellescape}; cat) | dcli sync`
         raise RuntimeError, "Failed to login to Dashlane" unless $?.success?
       end
     end
