@@ -2,13 +2,17 @@ class Kamal::Secrets::Adapters::Dashlane < Kamal::Secrets::Adapters::Base
   private
     def login(account)
       unless loggedin?(account)
-        `dcli sync`
+        if account.nil? || account.empty?
+          `dcli sync`
+        else
+          `(echo #{account.shellescape}; cat) | dcli sync`
+        end
         raise RuntimeError, "Failed to login to Dashlane" unless $?.success?
       end
     end
 
     def loggedin?(account)
-      `dcli accounts whoami`.strip == account
+      `dcli accounts whoami < /dev/null`.strip == account && $?.success?
     end
 
     def fetch_secrets(secrets, account:, session:)
@@ -26,5 +30,14 @@ class Kamal::Secrets::Adapters::Dashlane < Kamal::Secrets::Adapters::Base
           raise RuntimeError, "Could not find #{missing_items.join(", ")} in Dashlane"
         end
       end
+    end
+
+    def check_dependencies!
+      raise "Dashlane CLI is not installed" unless cli_installed?
+    end
+
+    def cli_installed?
+      `dcli --version 2> /dev/null`
+      $?.success?
     end
 end

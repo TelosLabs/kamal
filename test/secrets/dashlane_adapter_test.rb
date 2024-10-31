@@ -6,7 +6,8 @@ class DashlaneAdapterTest < SecretAdapterTestCase
   end
 
   test "fetch" do
-    stub_ticks.with("dcli accounts whoami").returns("email@example.com")
+    stub_ticks.with("dcli --version 2> /dev/null")
+    stub_ticks.with("dcli accounts whoami < /dev/null").returns("email@example.com")
 
     stub_ticks
       .with("dcli secret SECRET1 FOLDER1/FSECRET1 FOLDER1/FSECRET2 -o json")
@@ -63,7 +64,8 @@ class DashlaneAdapterTest < SecretAdapterTestCase
   end
 
   test "fetch with from" do
-    stub_ticks.with("dcli accounts whoami").returns("email@example.com")
+    stub_ticks.with("dcli --version 2> /dev/null")
+    stub_ticks.with("dcli accounts whoami < /dev/null").returns("email@example.com")
 
     stub_ticks
       .with("dcli secret FOLDER1/FSECRET1 FOLDER1/FSECRET2 -o json")
@@ -107,8 +109,9 @@ class DashlaneAdapterTest < SecretAdapterTestCase
   end
 
   test "fetch with signin" do
-    stub_ticks_with("dcli accounts whoami", succeed: false).returns("")
-    stub_ticks_with("dcli sync", succeed: true).returns("")
+    stub_ticks.with("dcli --version 2> /dev/null")
+    stub_ticks_with("dcli accounts whoami < /dev/null", succeed: false).returns("")
+    stub_ticks_with("(echo email@example.com; cat) | dcli sync").returns("")
     stub_ticks.with("dcli secret SECRET1 -o json").returns(single_item_json)
 
     json = JSON.parse(shellunescape(run_command("fetch", "SECRET1")))
@@ -118,6 +121,15 @@ class DashlaneAdapterTest < SecretAdapterTestCase
     }
 
     assert_equal expected_json, json
+  end
+
+  test "fetch without CLI installed" do
+    stub_ticks_with("dcli --version 2> /dev/null", succeed: false)
+
+    error = assert_raises RuntimeError do
+      JSON.parse(shellunescape(run_command("fetch", "SECRET1")))
+    end
+    assert_equal "Dashlane CLI is not installed", error.message
   end
 
   private
