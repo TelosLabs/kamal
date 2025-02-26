@@ -5,6 +5,7 @@ module Kamal::Secrets::Adapters
     name = "last_pass" if name.downcase == "lastpass"
     name = "gcp_secret_manager" if name.downcase == "gcp"
     name = "bitwarden_secrets_manager" if name.downcase == "bitwarden-sm"
+    name = "dashlane" if name.downcase == "dashlane"
     adapter_class(name)
   end
 
