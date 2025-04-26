@@ -1,45 +1,49 @@
 class Kamal::Secrets::Adapters::Dashlane < Kamal::Secrets::Adapters::Base
+  def requires_account?
+    false
+  end
+
   private
     def login(account)
-      unless loggedin?(account)
-        `echo #{account.shellescape} | dcli accounts whoami`
-        raise RuntimeError, "Failed to login to Dashlane" unless $?.success?
-      end
-    end
+      system('dcli sync', out: $stderr)
 
-    def loggedin?(account)
-      `(echo #{account.shellescape}; cat) | dcli accounts whoami`.strip == account && $?.success?
+      raise RuntimeError, "Failed to login to Dashlane" unless $?.success?
     end
 
     def fetch_secrets(secrets, from:, account:, session:)
-      pp "fetching secrets"
-      secrets = prefixed_secrets(secrets, from: from)
-      items = `dcli secret #{secrets.map(&:shellescape).join(" ")} -o json`
-      raise RuntimeError, "Failed to fetch secrets from Dashlane" unless $?.success?
+      secrets = secrets.map { uri(it) }.map(&:shellescape)
 
-      begin
-        items = JSON.parse(items)
-      rescue JSON::ParserError
-        raise RuntimeError, "Invalid JSON response from Dashlane CLI"
+      # TODO: Collect failed fetches and show a single error with all not found items.
+      # TODO: Handle parsing fields. `dcli read 'dl://gorails.com/password'`
+
+      items = secrets.map do |secret|
+        json = `dcli read #{secret}`
+
+        raise RuntimeError, "Failed to fetch secret \"${secret}\" from Dashlane" unless $?.success?
+
+        begin
+          JSON.parse(json)
+        rescue JSON::ParserError
+          raise RuntimeError, "Invalid JSON response from Dashlane CLI"
+        end
       end
 
+      # TODO: Make it work with secrets (doesn't have password)
       {}.tap do |results|
         items.each do |item|
-          results[item["title"]] = item["content"]
-        end
-
-        if (missing_items = secrets - results.keys).any?
-          raise RuntimeError, "Could not find the following items in Dashlane: #{missing_items.join(", ")}"
+          results[item["title"]] = item["password"]
         end
       end
     end
+
+    def uri(secret) = "dl://#{secret}"
 
     def check_dependencies!
       raise RuntimeError, "Dashlane CLI is not installed" unless cli_installed?
     end
 
     def cli_installed?
-      `dcli --version 2> /dev/null`
+      system('dcli --version', out: File::NULL)
       $?.success?
     end
 end
